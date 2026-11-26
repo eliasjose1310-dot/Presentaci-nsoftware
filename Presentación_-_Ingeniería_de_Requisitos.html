@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ingeniería de Requisitos — PNF en Informática 3305</title>
+  <!-- Tipografía limpia Inter con respaldo inmediato a Segoe UI y fuentes del sistema -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       VARIABLES Y CONFIGURACIÓN BASE
+       ========================================================================== */
+    :root {
+      --bg-outer: #f1f5f9;
+      --bg-slide: #ffffff;
+      --blue-deep: #0b46a3;
+      --blue-accent: #1d4ed8;
+      --blue-soft: #eff6ff;
+      --blue-border: #dbeafe;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border-subtle: #e2e8f0;
+      --shadow-slide: 0 20px 50px -15px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
+      --shadow-card: 0 4px 14px -2px rgba(15, 23, 42, 0.04);
+      --shadow-card-hover: 0 12px 26px -6px rgba(11, 70, 163, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
+      --radius-slide: 18px;
+      --radius-card: 14px;
+      --transition-fast: 180ms cubic-bezier(0.22, 1, 0.36, 1);
+      --transition-slide: 380ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      background-color: var(--bg-outer);
+      color: var(--text-primary);
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* ==========================================================================
+       BARRA DE PROGRESO SUPERIOR
+       ========================================================================== */
+    .progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background-color: rgba(203, 213, 225, 0.55);
+      z-index: 100;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 25%;
+      background: linear-gradient(90deg, var(--blue-deep), var(--blue-accent));
+      border-radius: 0 4px 4px 0;
+      transition: width 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* ==========================================================================
+       ESTRUCTURA PRINCIPAL DEL VISOR
+       ========================================================================== */
+    .viewer-shell {
+      min-height: 100dvh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px 16px;
+      gap: 14px;
+    }
+
+    /* Contenedor central que enmarca la diapositiva 16:9 */
+    .stage-wrapper {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    .slide-deck {
+      position: relative;
+      /* Mantiene proporción 16:9 sin desbordar ni horizontal ni verticalmente */
+      width: min(94vw, calc((100dvh - 108px) * 16 / 9), 1240px);
+      aspect-ratio: 16 / 9;
+      background-color: var(--bg-slide);
+      border-radius: var(--radius-slide);
+      box-shadow: var(--shadow-slide);
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      overflow: hidden;
+      touch-action: pan-y;
+    }
+
+    /* Cada diapositiva individual */
+    .slide {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: clamp(24px, 4.2%, 56px) clamp(28px, 5%, 68px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background-color: var(--bg-slide);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateX(28px);
+      transition: opacity var(--transition-slide), transform var(--transition-slide), visibility 0s linear 380ms;
+    }
+
+    .slide.from-left {
+      transform: translateX(-28px);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateX(0);
+      transition: opacity var(--transition-slide), transform var(--transition-slide), visibility 0s linear 0s;
+    }
+
+    /* ==========================================================================
+       ENCABEZADOS REUTILIZABLES DE DIAPOSITIVAS (2, 3, 4)
+       ========================================================================== */
+    .slide-header {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: clamp(8px, 1.2vw, 14px);
+      margin-bottom: clamp(16px, 2.2vw, 28px);
+      flex-shrink: 0;
+    }
+
+    .slide-title {
+      font-size: clamp(1.35rem, 2.7vw, 2.35rem);
+      font-weight: 800;
+      color: var(--blue-deep);
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+
+    .title-accent {
+      width: clamp(48px, 6vw, 76px);
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--blue-deep), var(--blue-accent));
+    }
+
+    /* ==========================================================================
+       DIAPOSITIVA 1: PORTADA
+       ========================================================================== */
+    .slide-cover {
+      justify-content: space-between;
+      align-items: center;
+      text-align: center;
+      padding-top: clamp(22px, 3.8%, 48px);
+      padding-bottom: clamp(22px, 3.6%, 44px);
+    }
+
+    .institutional-header {
+      font-size: clamp(0.68rem, 1.15vw, 0.96rem);
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.55;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .cover-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: clamp(8px, 1.5vw, 20px) 0;
+    }
+
+    .cover-divider {
+      width: clamp(56px, 7vw, 84px);
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--blue-deep), var(--blue-accent));
+      margin-bottom: clamp(14px, 2vw, 24px);
+    }
+
+    .cover-title {
+      font-size: clamp(1.85rem, 4.1vw, 3.65rem);
+      font-weight: 800;
+      color: var(--blue-deep);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .cover-subtitle {
+      font-size: clamp(0.95rem, 1.65vw, 1.35rem);
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-top: clamp(8px, 1.1vw, 14px);
+      letter-spacing: -0.01em;
+    }
+
+    .cover-meta {
+      width: 100%;
+      max-width: 920px;
+      display: grid;
+      grid-template-columns: 1.35fr 0.85fr;
+      gap: clamp(18px, 3vw, 44px);
+      text-align: left;
+      background-color: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-left: 5px solid var(--blue-deep);
+      border-radius: var(--radius-card);
+      padding: clamp(14px, 2.2vw, 28px) clamp(18px, 2.8vw, 36px);
+    }
+
+    .meta-label {
+      font-size: clamp(0.82rem, 1.25vw, 1.05rem);
+      font-weight: 700;
+      color: var(--blue-deep);
+      margin-bottom: clamp(6px, 0.8vw, 10px);
+      letter-spacing: -0.01em;
+    }
+
+    .meta-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(3px, 0.45vw, 6px);
+      font-size: clamp(0.76rem, 1.15vw, 0.98rem);
+      color: var(--text-primary);
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .meta-teacher-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      border-left: 1px solid var(--border-subtle);
+      padding-left: clamp(16px, 2.6vw, 34px);
+    }
+
+    .meta-teacher-name {
+      font-size: clamp(0.85rem, 1.3vw, 1.08rem);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* ==========================================================================
+       DIAPOSITIVA 2: EL PROCESO DE REQUISITOS (FLUJO 3 PASOS)
+       ========================================================================== */
+    .process-flow {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: clamp(10px, 1.8vw, 24px);
+      padding: 0 clamp(4px, 1.5vw, 24px);
+    }
+
+    .process-step {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: clamp(16px, 2.2vw, 32px) clamp(12px, 1.5vw, 22px);
+      border-radius: var(--radius-card);
+      transition: transform var(--transition-fast), background-color var(--transition-fast);
+    }
+
+    .process-step:hover {
+      transform: translateY(-4px);
+      background-color: #f8fafc;
+    }
+
+    .step-icon-circle {
+      width: clamp(72px, 8.8vw, 114px);
+      height: clamp(72px, 8.8vw, 114px);
+      border-radius: 50%;
+      background-color: var(--blue-soft);
+      border: 1px solid var(--blue-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--blue-deep);
+      margin-bottom: clamp(14px, 1.9vw, 24px);
+      box-shadow: 0 8px 20px -8px rgba(29, 78, 216, 0.22);
+    }
+
+    .step-icon-circle svg {
+      width: 48%;
+      height: 48%;
+    }
+
+    .step-title {
+      font-size: clamp(1.1rem, 1.95vw, 1.65rem);
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: clamp(6px, 0.7vw, 10px);
+      letter-spacing: -0.015em;
+    }
+
+    .step-desc {
+      font-size: clamp(0.88rem, 1.35vw, 1.15rem);
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .flow-arrow {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #cbd5e1;
+      margin-top: -36px;
+    }
+
+    .flow-arrow svg {
+      width: clamp(24px, 3vw, 40px);
+      height: clamp(24px, 3vw, 40px);
+    }
+
+    /* ==========================================================================
+       DIAPOSITIVA 3: CARACTERÍSTICAS DE UN BUEN REQUISITO (GRID 2x2)
+       ========================================================================== */
+    .features-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: clamp(14px, 2vw, 26px);
+      align-content: center;
+    }
+
+    .feature-card {
+      background-color: var(--bg-slide);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-card);
+      padding: clamp(18px, 2.4vw, 32px) clamp(18px, 2.4vw, 30px);
+      display: flex;
+      align-items: center;
+      gap: clamp(14px, 1.8vw, 24px);
+      box-shadow: var(--shadow-card);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card-hover);
+      border-color: #bfdbfe;
+    }
+
+    .feature-icon {
+      flex-shrink: 0;
+      width: clamp(50px, 5.4vw, 72px);
+      height: clamp(50px, 5.4vw, 72px);
+      border-radius: 50%;
+      background-color: var(--blue-soft);
+      border: 1px solid var(--blue-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--blue-accent);
+    }
+
+    .feature-icon svg {
+      width: 50%;
+      height: 50%;
+    }
+
+    .feature-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .feature-title {
+      font-size: clamp(1.05rem, 1.75vw, 1.48rem);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.015em;
+    }
+
+    .feature-desc {
+      font-size: clamp(0.85rem, 1.28vw, 1.1rem);
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* ==========================================================================
+       DIAPOSITIVA 4: CLASIFICACIÓN DE REQUISITOS (2 TARJETAS COMPARATIVAS)
+       ========================================================================== */
+    .compare-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: clamp(18px, 2.8vw, 36px);
+      align-items: stretch;
+      padding-bottom: 4px;
+    }
+
+    .compare-card {
+      background-color: #f8fafc;
+      border: 1px solid var(--border-subtle);
+      border-top: 5px solid var(--blue-deep);
+      border-radius: var(--radius-card);
+      padding: clamp(22px, 3vw, 40px) clamp(22px, 3vw, 38px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: var(--shadow-card);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .compare-card.card-user {
+      border-top-color: var(--blue-accent);
+    }
+
+    .compare-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-card-hover);
+    }
+
+    .compare-head {
+      display: flex;
+      align-items: center;
+      gap: clamp(14px, 1.6vw, 20px);
+      margin-bottom: clamp(18px, 2.4vw, 30px);
+      padding-bottom: clamp(14px, 1.8vw, 22px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .compare-icon {
+      flex-shrink: 0;
+      width: clamp(50px, 5.2vw, 68px);
+      height: clamp(50px, 5.2vw, 68px);
+      border-radius: 14px;
+      background-color: var(--blue-soft);
+      border: 1px solid var(--blue-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--blue-deep);
+    }
+
+    .compare-card.card-user .compare-icon {
+      color: var(--blue-accent);
+    }
+
+    .compare-icon svg {
+      width: 52%;
+      height: 52%;
+    }
+
+    .compare-title {
+      font-size: clamp(1.2rem, 2.1vw, 1.8rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .compare-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(12px, 1.7vw, 22px);
+    }
+
+    .compare-list li {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: clamp(0.95rem, 1.55vw, 1.32rem);
+      color: var(--text-secondary);
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .bullet-dot {
+      flex-shrink: 0;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background-color: var(--blue-accent);
+    }
+
+    .compare-list strong {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    /* ==========================================================================
+       BARRA INFERIOR DE CONTROLES
+       ========================================================================== */
+    .controls-bar {
+      width: min(94vw, 1240px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background-color: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 8px 14px;
+      box-shadow: 0 4px 16px -4px rgba(15, 23, 42, 0.06);
+      flex-shrink: 0;
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ctrl-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 40px;
+      padding: 0 14px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background-color: transparent;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+      user-select: none;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      background-color: var(--blue-soft);
+      color: var(--blue-deep);
+    }
+
+    .ctrl-btn:focus-visible {
+      outline: 2px solid var(--blue-accent);
+      outline-offset: 2px;
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .ctrl-btn.primary-nav {
+      background-color: var(--blue-deep);
+      color: #ffffff;
+    }
+
+    .ctrl-btn.primary-nav:hover:not(:disabled) {
+      background-color: var(--blue-accent);
+      color: #ffffff;
+    }
+
+    .ctrl-btn svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .slide-counter {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+      padding: 0 6px;
+      min-width: 48px;
+      text-align: center;
+    }
+
+    /* Puntos interactivos */
+    .dots-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 6px;
+    }
+
+    .dot-btn {
+      width: 10px;
+      height: 10px;
+      padding: 0;
+      border: none;
+      border-radius: 999px;
+      background-color: #cbd5e1;
+      cursor: pointer;
+      transition: width 240ms ease, background-color 240ms ease;
+    }
+
+    .dot-btn:hover {
+      background-color: #93c5fd;
+    }
+
+    .dot-btn.active {
+      width: 28px;
+      background-color: var(--blue-deep);
+    }
+
+    .dot-btn:focus-visible {
+      outline: 2px solid var(--blue-accent);
+      outline-offset: 3px;
+    }
+
+    /* ==========================================================================
+       MODAL DE VISTA GENERAL (CUADRÍCULA DE 4 LÁMINAS)
+       ========================================================================== */
+    .overview-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background-color: rgba(15, 23, 42, 0.58);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 240ms ease, visibility 0s linear 240ms;
+    }
+
+    .overview-overlay.open {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 240ms ease, visibility 0s linear 0s;
+    }
+
+    .overview-modal {
+      width: min(96vw, 960px);
+      max-height: 90dvh;
+      overflow-y: auto;
+      background-color: #f8fafc;
+      border-radius: 20px;
+      border: 1px solid var(--border-subtle);
+      padding: 24px;
+      box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.3);
+      transform: scale(0.96);
+      transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .overview-overlay.open .overview-modal {
+      transform: scale(1);
+    }
+
+    .overview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .overview-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .thumb-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: left;
+      aspect-ratio: 16 / 9;
+      background-color: #ffffff;
+      border: 2px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px 20px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .thumb-card:hover {
+      transform: translateY(-2px);
+      border-color: #93c5fd;
+      box-shadow: 0 10px 24px -8px rgba(11, 70, 163, 0.16);
+    }
+
+    .thumb-card.active {
+      border-color: var(--blue-deep);
+      box-shadow: 0 0 0 3px rgba(11, 70, 163, 0.14);
+    }
+
+    .thumb-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .thumb-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background-color: var(--blue-soft);
+      color: var(--blue-deep);
+    }
+
+    .thumb-card.active .thumb-badge {
+      background-color: var(--blue-deep);
+      color: #ffffff;
+    }
+
+    .thumb-heading {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--blue-deep);
+      margin-top: 8px;
+      line-height: 1.25;
+    }
+
+    .thumb-sub {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .thumb-mini-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 10px;
+    }
+
+    .mini-pill {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background-color: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    /* ==========================================================================
+       MENSAJE DISCRETO (TOAST) EN LUGAR DE ALERT()
+       ========================================================================== */
+    .toast-msg {
+      position: fixed;
+      bottom: 84px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background-color: var(--text-primary);
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 10px 18px;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease, transform 220ms ease;
+      z-index: 300;
+      text-align: center;
+      max-width: 90vw;
+    }
+
+    .toast-msg.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================================================
+       MODO PANTALLA COMPLETA
+       ========================================================================== */
+    :fullscreen .viewer-shell,
+    :-webkit-full-screen .viewer-shell {
+      padding: 14px 20px 12px;
+      background-color: var(--bg-outer);
+    }
+
+    :fullscreen .slide-deck,
+    :-webkit-full-screen .slide-deck {
+      width: min(97vw, calc((100dvh - 88px) * 16 / 9));
+      max-width: none;
+    }
+
+    /* ==========================================================================
+       ADAPTACIÓN RESPONSIVA PARA TELÉFONOS MÓVILES Y PANTALLAS PEQUEÑAS
+       ========================================================================== */
+    @media (max-width: 820px) {
+      .viewer-shell {
+        padding: 16px 12px 14px;
+        gap: 12px;
+      }
+
+      /* En teléfonos el marco adopta altura fluida para lectura cómoda sin zoom */
+      .slide-deck {
+        width: 100%;
+        aspect-ratio: auto;
+        min-height: calc(100dvh - 116px);
+        border-radius: 16px;
+      }
+
+      .slide {
+        position: relative;
+        display: none;
+        min-height: calc(100dvh - 116px);
+        padding: 26px 20px;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+      }
+
+      .slide.active {
+        display: flex;
+        animation: mobileFadeIn 300ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      @keyframes mobileFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Diapositiva 1 en móvil */
+      .slide-cover {
+        gap: 20px;
+      }
+
+      .institutional-header {
+        font-size: 0.72rem;
+        line-height: 1.5;
+      }
+
+      .cover-title {
+        font-size: 1.9rem;
+      }
+
+      .cover-subtitle {
+        font-size: 0.98rem;
+      }
+
+      .cover-meta {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 16px 18px;
+      }
+
+      .meta-teacher-col {
+        border-left: none;
+        border-top: 1px solid var(--border-subtle);
+        padding-left: 0;
+        padding-top: 14px;
+      }
+
+      /* Diapositiva 2: flujo vertical con flechas hacia abajo */
+      .process-flow {
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+        padding: 4px 0;
+      }
+
+      .process-step {
+        width: 100%;
+        flex-direction: row;
+        text-align: left;
+        gap: 16px;
+        padding: 14px 16px;
+        background-color: #f8fafc;
+        border: 1px solid var(--border-subtle);
+      }
+
+      .step-icon-circle {
+        width: 58px;
+        height: 58px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+
+      .flow-arrow {
+        margin-top: 0;
+        transform: rotate(90deg);
+      }
+
+      .flow-arrow svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      /* Diapositiva 3: tarjetas apiladas */
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .feature-card {
+        padding: 16px;
+      }
+
+      /* Diapositiva 4: tarjetas comparativas apiladas */
+      .compare-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .compare-card {
+        padding: 20px;
+      }
+
+      /* Barra inferior compacta en móvil */
+      .controls-bar {
+        width: 100%;
+        padding: 8px 10px;
+        gap: 6px;
+      }
+
+      .ctrl-btn {
+        padding: 0 10px;
+        height: 42px;
+      }
+
+      .btn-text-hide-sm {
+        display: none;
+      }
+
+      .overview-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .thumb-card {
+        aspect-ratio: auto;
+        min-height: 124px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .dots-nav {
+        gap: 5px;
+      }
+
+      .dot-btn.active {
+        width: 20px;
+      }
+
+      .slide-counter {
+        font-size: 0.8rem;
+        min-width: 38px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra de progreso superior -->
+  <div class="progress-track" aria-hidden="true">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <!-- Contenedor principal de la presentación -->
+  <div class="viewer-shell" id="viewerShell">
+    <main class="stage-wrapper">
+      <div class="slide-deck" id="slideDeck" role="region" aria-roledescription="presentación" aria-label="Diapositivas de Ingeniería de Requisitos">
+
+        <!-- ================================================================
+             DIAPOSITIVA 1: PORTADA
+             ================================================================ -->
+        <section class="slide slide-cover active" data-index="0" aria-label="Diapositiva 1 de 4: Portada">
+          <header class="institutional-header">
+            REPÚBLICA BOLIVARIANA DE VENEZUELA<br>
+            MINISTERIO DEL PODER POPULAR PARA LA EDUCACIÓN SUPERIOR<br>
+            UNIVERSIDAD POLITÉCNICA TERRITORIAL DE MARACAIBO<br>
+            PNF EN INFORMÁTICA 3305
+          </header>
+
+          <div class="cover-center">
+            <div class="cover-divider" aria-hidden="true"></div>
+            <h1 class="cover-title">Ingeniería de Requisitos</h1>
+            <p class="cover-subtitle">Fundamentos, Clasificación y Ejemplos Prácticos</p>
+          </div>
+
+          <footer class="cover-meta">
+            <div>
+              <h2 class="meta-label">Integrantes:</h2>
+              <ul class="meta-list">
+                <li>Acosta P. Otto A. C.I.: 31.259.273</li>
+                <li>Vazques R. Angel A. C.I.: 32.082.654</li>
+                <li>Huerta G. Elias J. C.I.: 31.60.322</li>
+                <li>Mosquera O. Brayan J. C.I.: 31.094.635</li>
+                <li>Ordoñez S. Santiago D. C.I.: 31.989.414</li>
+              </ul>
+            </div>
+            <div class="meta-teacher-col">
+              <h2 class="meta-label">Profesora:</h2>
+              <p class="meta-teacher-name">Naidaly Rincón</p>
+            </div>
+          </footer>
+        </section>
+
+        <!-- ================================================================
+             DIAPOSITIVA 2: EL PROCESO DE REQUISITOS
+             ================================================================ -->
+        <section class="slide" data-index="1" aria-label="Diapositiva 2 de 4: El Proceso de Requisitos">
+          <header class="slide-header">
+            <h2 class="slide-title">El Proceso de Requisitos</h2>
+            <div class="title-accent" aria-hidden="true"></div>
+          </header>
+
+          <div class="process-flow">
+            <!-- Paso 1: Necesidad -->
+            <article class="process-step">
+              <div class="step-icon-circle" aria-hidden="true">
+                <!-- Ícono SVG: Persona / Usuario de negocios -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="7" r="4"></circle>
+                  <path d="M5 20.5c0-3.8 3.1-6.5 7-6.5s7 2.7 7 6.5"></path>
+                  <path d="M12 14l-1.2 2.4L12 19l1.2-2.6L12 14z" fill="currentColor" stroke="none"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="step-title">Necesidad</h3>
+                <p class="step-desc">Problema inicial.</p>
+              </div>
+            </article>
+
+            <!-- Flecha conectora 1 -->
+            <div class="flow-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="12" x2="20" y2="12"></line>
+                <polyline points="14 6 20 12 14 18"></polyline>
+              </svg>
+            </div>
+
+            <!-- Paso 2: Análisis -->
+            <article class="process-step">
+              <div class="step-icon-circle" aria-hidden="true">
+                <!-- Ícono SVG: Dos engranajes -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9.2" cy="14.2" r="2.3"></circle>
+                  <path d="M9.2 9.4v1.1M9.2 17.9V19M4.4 14.2h1.1M12.9 14.2H14M5.8 10.8l.8.8M11.8 16.8l.8.8M12.6 10.8l-.8.8M6.6 16.8l-.8.8"></path>
+                  <circle cx="16.8" cy="7.6" r="1.7"></circle>
+                  <path d="M16.8 4.2v.9M16.8 10.1v.9M13.4 7.6h.9M19.3 7.6h.9M14.4 5.2l.6.6M18.6 9.4l.6.6M19.2 5.2l-.6.6M15 9.4l-.6.6"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="step-title">Análisis</h3>
+                <p class="step-desc">Traducción técnica.</p>
+              </div>
+            </article>
+
+            <!-- Flecha conectora 2 -->
+            <div class="flow-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" y1="12" x2="20" y2="12"></line>
+                <polyline points="14 6 20 12 14 18"></polyline>
+              </svg>
+            </div>
+
+            <!-- Paso 3: Sistema -->
+            <article class="process-step">
+              <div class="step-icon-circle" aria-hidden="true">
+                <!-- Ícono SVG: Laptop con símbolo </> -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3.5" y="4.5" width="17" height="12" rx="2"></rect>
+                  <path d="M2 19.5h20"></path>
+                  <polyline points="9.2 8.8 7.2 10.5 9.2 12.2"></polyline>
+                  <polyline points="14.8 8.8 16.8 10.5 14.8 12.2"></polyline>
+                  <line x1="12.7" y1="8.3" x2="11.3" y2="12.7"></line>
+                </svg>
+              </div>
+              <div>
+                <h3 class="step-title">Sistema</h3>
+                <p class="step-desc">Solución final.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             DIAPOSITIVA 3: CARACTERÍSTICAS DE UN BUEN REQUISITO
+             ================================================================ -->
+        <section class="slide" data-index="2" aria-label="Diapositiva 3 de 4: Características de un Buen Requisito">
+          <header class="slide-header">
+            <h2 class="slide-title">Características de un Buen Requisito</h2>
+            <div class="title-accent" aria-hidden="true"></div>
+          </header>
+
+          <div class="features-grid">
+            <!-- Tarjeta 1: Claros -->
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">
+                <!-- Ícono SVG: Claridad / Enfoque -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </div>
+              <div class="feature-body">
+                <h3 class="feature-title">Claros</h3>
+                <p class="feature-desc">Cero ambigüedad.</p>
+              </div>
+            </article>
+
+            <!-- Tarjeta 2: Precisos -->
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">
+                <!-- Ícono SVG: Diana / Objetivo -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                </svg>
+              </div>
+              <div class="feature-body">
+                <h3 class="feature-title">Precisos</h3>
+                <p class="feature-desc">Exactos en propósito.</p>
+              </div>
+            </article>
+
+            <!-- Tarjeta 3: Completos -->
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">
+                <!-- Ícono SVG: Documento / Lista completa -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                  <rect x="9" y="3" width="6" height="4" rx="1"></rect>
+                  <path d="M9 12h6"></path>
+                  <path d="M9 16h6"></path>
+                </svg>
+              </div>
+              <div class="feature-body">
+                <h3 class="feature-title">Completos</h3>
+                <p class="feature-desc">Información total.</p>
+              </div>
+            </article>
+
+            <!-- Tarjeta 4: Verificables -->
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">
+                <!-- Ícono SVG: Escudo con check de verificación -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l7 3v5.5c0 4.5-3 8.1-7 9.5-4-1.4-7-5-7-9.5V6l7-3z"></path>
+                  <polyline points="9 12 11.2 14.2 15.5 9.8"></polyline>
+                </svg>
+              </div>
+              <div class="feature-body">
+                <h3 class="feature-title">Verificables</h3>
+                <p class="feature-desc">100% comprobables.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             DIAPOSITIVA 4: CLASIFICACIÓN DE REQUISITOS
+             ================================================================ -->
+        <section class="slide" data-index="3" aria-label="Diapositiva 4 de 4: Clasificación de Requisitos">
+          <header class="slide-header">
+            <h2 class="slide-title">Clasificación de Requisitos</h2>
+            <div class="title-accent" aria-hidden="true"></div>
+          </header>
+
+          <div class="compare-grid">
+            <!-- Tarjeta Izquierda: De Negocio -->
+            <article class="compare-card">
+              <div class="compare-head">
+                <div class="compare-icon" aria-hidden="true">
+                  <!-- Ícono SVG: Edificio corporativo -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"></path>
+                    <path d="M16 11h3a1 1 0 0 1 1 1v9"></path>
+                    <path d="M2 21h20"></path>
+                    <path d="M8 7h1M11 7h1M8 11h1M11 11h1M8 15h1M11 15h1"></path>
+                  </svg>
+                </div>
+                <h3 class="compare-title">De Negocio</h3>
+              </div>
+
+              <ul class="compare-list">
+                <li>
+                  <span class="bullet-dot" aria-hidden="true"></span>
+                  <span>El <strong>"por qué"</strong>.</span>
+                </li>
+                <li>
+                  <span class="bullet-dot" aria-hidden="true"></span>
+                  <span>Metas organizacionales.</span>
+                </li>
+                <li>
+                  <span class="bullet-dot" aria-hidden="true"></span>
+                  <span>Beneficios medibles.</span>
+                </li>
+              </ul>
+            </article>
+
+            <!-- Tarjeta Derecha: De Usuario -->
+            <article class="compare-card card-user">
+              <div class="compare-head">
+                <div class="compare-icon" aria-hidden="true">
+                  <!-- Ícono SVG: Usuario / Interfaz -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9.5" cy="8" r="3.5"></circle>
+                    <path d="M3.5 19.5c0-3.2 2.7-5.5 6-5.5s6 2.3 6 5.5"></path>
+                    <path d="M16 7.5a2.6 2.6 0 0 1 0 5"></path>
+                    <path d="M18.2 14.3c1.6.7 2.8 2.2 2.8 4.2"></path>
+                  </svg>
+                </div>
+                <h3 class="compare-title">De Usuario</h3>
+              </div>
+
+              <ul class="compare-list">
+                <li>
+                  <span class="bullet-dot" aria-hidden="true"></span>
+                  <span>El <strong>"qué"</strong>.</span>
+                </li>
+                <li>
+                  <span class="bullet-dot" aria-hidden="true"></span>
+                  <span>Tareas operativas.</span>
+                </li>
+                <li>
+                  <span class="bullet-dot" aria-hidden="true"></span>
+                  <span>Interacción directa.</span>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- ====================================================================
+         BARRA INFERIOR DE CONTROLES
+         ==================================================================== -->
+    <nav class="controls-bar" aria-label="Controles de presentación">
+      <!-- Navegación Anterior / Siguiente -->
+      <div class="controls-group">
+        <button type="button" class="ctrl-btn" id="prevBtn" aria-label="Diapositiva anterior" title="Anterior (Flecha izquierda)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span class="btn-text-hide-sm">Anterior</span>
+        </button>
+
+        <button type="button" class="ctrl-btn primary-nav" id="nextBtn" aria-label="Diapositiva siguiente" title="Siguiente (Flecha derecha o Espacio)">
+          <span class="btn-text-hide-sm">Siguiente</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Indicador numérico y puntos interactivos -->
+      <div class="controls-group">
+        <span class="slide-counter" id="slideCounter" aria-live="polite">1 / 4</span>
+        <div class="dots-nav" role="tablist" aria-label="Seleccionar diapositiva">
+          <button type="button" class="dot-btn active" data-goto="0" role="tab" aria-selected="true" aria-label="Ir a diapositiva 1: Portada"></button>
+          <button type="button" class="dot-btn" data-goto="1" role="tab" aria-selected="false" aria-label="Ir a diapositiva 2: El Proceso de Requisitos"></button>
+          <button type="button" class="dot-btn" data-goto="2" role="tab" aria-selected="false" aria-label="Ir a diapositiva 3: Características de un Buen Requisito"></button>
+          <button type="button" class="dot-btn" data-goto="3" role="tab" aria-selected="false" aria-label="Ir a diapositiva 4: Clasificación de Requisitos"></button>
+        </div>
+      </div>
+
+      <!-- Vista general y Pantalla completa -->
+      <div class="controls-group">
+        <button type="button" class="ctrl-btn" id="overviewBtn" aria-label="Vista general de todas las láminas" title="Vista general / Todas las láminas">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+          <span class="btn-text-hide-sm">Vista general</span>
+        </button>
+
+        <button type="button" class="ctrl-btn" id="fullscreenBtn" aria-label="Alternar pantalla completa" title="Pantalla completa (Tecla F)">
+          <svg id="fsEnterIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+          <svg id="fsExitIcon" style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 14 10 14 10 20"></polyline>
+            <polyline points="20 10 14 10 14 4"></polyline>
+            <line x1="14" y1="10" x2="21" y2="3"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+          <span class="btn-text-hide-sm" id="fsLabel">Pantalla completa</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ======================================================================
+       MODAL DE VISTA GENERAL (TODAS LAS LÁMINAS EN CUADRÍCULA)
+       ====================================================================== -->
+  <div class="overview-overlay" id="overviewOverlay" role="dialog" aria-modal="true" aria-labelledby="overviewHeading">
+    <div class="overview-modal">
+      <div class="overview-header">
+        <h2 class="overview-title" id="overviewHeading">Todas las láminas (4)</h2>
+        <button type="button" class="ctrl-btn" id="closeOverviewBtn" aria-label="Cerrar vista general">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          <span>Cerrar</span>
+        </button>
+      </div>
+
+      <div class="overview-grid">
+        <button type="button" class="thumb-card active" data-thumb="0">
+          <div class="thumb-top">
+            <span class="thumb-badge">Lámina 1</span>
+          </div>
+          <div>
+            <div class="thumb-heading">Ingeniería de Requisitos</div>
+            <div class="thumb-sub">Fundamentos, Clasificación y Ejemplos Prácticos — PNF en Informática 3305</div>
+          </div>
+          <div class="thumb-mini-pills">
+            <span class="mini-pill">Portada</span>
+            <span class="mini-pill">5 Integrantes</span>
+            <span class="mini-pill">Prof. Naidaly Rincón</span>
+          </div>
+        </button>
+
+        <button type="button" class="thumb-card" data-thumb="1">
+          <div class="thumb-top">
+            <span class="thumb-badge">Lámina 2</span>
+          </div>
+          <div>
+            <div class="thumb-heading">El Proceso de Requisitos</div>
+            <div class="thumb-sub">Flujo visual en 3 etapas desde el problema hasta la solución final.</div>
+          </div>
+          <div class="thumb-mini-pills">
+            <span class="mini-pill">Necesidad</span>
+            <span class="mini-pill">Análisis</span>
+            <span class="mini-pill">Sistema</span>
+          </div>
+        </button>
+
+        <button type="button" class="thumb-card" data-thumb="2">
+          <div class="thumb-top">
+            <span class="thumb-badge">Lámina 3</span>
+          </div>
+          <div>
+            <div class="thumb-heading">Características de un Buen Requisito</div>
+            <div class="thumb-sub">Cuatro propiedades esenciales para redactar requisitos de calidad.</div>
+          </div>
+          <div class="thumb-mini-pills">
+            <span class="mini-pill">Claros</span>
+            <span class="mini-pill">Precisos</span>
+            <span class="mini-pill">Completos</span>
+            <span class="mini-pill">Verificables</span>
+          </div>
+        </button>
+
+        <button type="button" class="thumb-card" data-thumb="3">
+          <div class="thumb-top">
+            <span class="thumb-badge">Lámina 4</span>
+          </div>
+          <div>
+            <div class="thumb-heading">Clasificación de Requisitos</div>
+            <div class="thumb-sub">Comparativa entre nivel gerencial y nivel operativo del usuario.</div>
+          </div>
+          <div class="thumb-mini-pills">
+            <span class="mini-pill">De Negocio</span>
+            <span class="mini-pill">De Usuario</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mensaje flotante discreto (reemplazo seguro de alert) -->
+  <div class="toast-msg" id="toastMsg" role="status" aria-live="polite"></div>
+
+  <script>
+    /**
+     * Controlador del visor interactivo de diapositivas.
+     * Soporta botones, puntos, teclado, gestos táctiles (swipe), vista general y pantalla completa.
+     */
+    (function () {
+      'use strict';
+
+      // Referencias del DOM
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const dots = Array.from(document.querySelectorAll('.dot-btn'));
+      const thumbs = Array.from(document.querySelectorAll('.thumb-card'));
+      const slideDeck = document.getElementById('slideDeck');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const slideCounter = document.getElementById('slideCounter');
+      const progressFill = document.getElementById('progressFill');
+      const overviewBtn = document.getElementById('overviewBtn');
+      const overviewOverlay = document.getElementById('overviewOverlay');
+      const closeOverviewBtn = document.getElementById('closeOverviewBtn');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+      const fsEnterIcon = document.getElementById('fsEnterIcon');
+      const fsExitIcon = document.getElementById('fsExitIcon');
+      const fsLabel = document.getElementById('fsLabel');
+      const toastMsg = document.getElementById('toastMsg');
+
+      const totalSlides = slides.length;
+      let currentIndex = 0;
+      let toastTimer = null;
+
+      // Estado para gestos táctiles (swipe)
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let isSwiping = false;
+
+      /**
+       * Muestra una notificación breve en pantalla sin usar alert().
+       */
+      function showToast(message) {
+        toastMsg.textContent = message;
+        toastMsg.classList.add('visible');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toastMsg.classList.remove('visible');
+        }, 2600);
+      }
+
+      /**
+       * Cambia a la diapositiva indicada con transición direccional suave.
+       */
+      function goToSlide(targetIndex) {
+        if (targetIndex < 0 || targetIndex >= totalSlides || targetIndex === currentIndex) {
+          return;
+        }
+
+        const direction = targetIndex > currentIndex ? 'next' : 'prev';
+        const outgoingSlide = slides[currentIndex];
+        const incomingSlide = slides[targetIndex];
+
+        // Posiciona la entrada según dirección para una animación natural
+        incomingSlide.classList.toggle('from-left', direction === 'prev');
+
+        // Forzar reflow breve para que el punto inicial de la transición se aplique bien
+        void incomingSlide.offsetWidth;
+
+        outgoingSlide.classList.remove('active');
+        outgoingSlide.classList.toggle('from-left', direction === 'next');
+
+        incomingSlide.classList.remove('from-left');
+        incomingSlide.classList.add('active');
+
+        currentIndex = targetIndex;
+        updateUI();
+      }
+
+      /**
+       * Actualiza contador, barra de progreso, botones, puntos y miniaturas activas.
+       */
+      function updateUI() {
+        slideCounter.textContent = `${currentIndex + 1} / ${totalSlides}`;
+
+        const progressPercent = ((currentIndex + 1) / totalSlides) * 100;
+        progressFill.style.width = `${progressPercent}%`;
+
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = currentIndex === totalSlides - 1;
+
+        dots.forEach((dot, idx) => {
+          const isActive = idx === currentIndex;
+          dot.classList.toggle('active', isActive);
+          dot.setAttribute('aria-selected', String(isActive));
+        });
+
+        thumbs.forEach((thumb, idx) => {
+          thumb.classList.toggle('active', idx === currentIndex);
+        });
+
+        // Guardar número de diapositiva en el hash de la URL de forma segura
+        try {
+          window.history.replaceState(null, '', `#lamina-${currentIndex + 1}`);
+        } catch (err) {
+          // Ignorar si el navegador restringe history en ciertos entornos embebidos
+        }
+      }
+
+      /**
+       * Abre o cierra la vista general en cuadrícula.
+       */
+      function setOverviewOpen(isOpen) {
+        overviewOverlay.classList.toggle('open', isOpen);
+        if (isOpen) {
+          closeOverviewBtn.focus();
+        }
+      }
+
+      /**
+       * Alterna el modo Pantalla Completa con manejo de errores seguro.
+       */
+      async function toggleFullscreen() {
+        try {
+          const docEl = document.documentElement;
+          const isFull = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+
+          if (!isFull) {
+            if (docEl.requestFullscreen) {
+              await docEl.requestFullscreen();
+            } else if (docEl.webkitRequestFullscreen) {
+              docEl.webkitRequestFullscreen();
+            } else {
+              showToast('Tu navegador no admite pantalla completa automática.');
+            }
+          } else {
+            if (document.exitFullscreen) {
+              await document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+              document.webkitExitFullscreen();
+            }
+          }
+        } catch (error) {
+          showToast('No se pudo activar pantalla completa en esta vista.');
+        }
+      }
+
+      /**
+       * Sincroniza el ícono y texto del botón de pantalla completa.
+       */
+      function syncFullscreenUI() {
+        const isFull = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+        fsEnterIcon.style.display = isFull ? 'none' : 'block';
+        fsExitIcon.style.display = isFull ? 'block' : 'none';
+        fsLabel.textContent = isFull ? 'Salir' : 'Pantalla completa';
+      }
+
+      // ======================================================================
+      // EVENTOS DE BOTONES Y MINIATURAS
+      // ======================================================================
+      prevBtn.addEventListener('click', () => goToSlide(currentIndex - 1));
+      nextBtn.addEventListener('click', () => goToSlide(currentIndex + 1));
+
+      dots.forEach((dot) => {
+        dot.addEventListener('click', () => {
+          const idx = Number(dot.getAttribute('data-goto'));
+          goToSlide(idx);
+        });
+      });
+
+      thumbs.forEach((thumb) => {
+        thumb.addEventListener('click', () => {
+          const idx = Number(thumb.getAttribute('data-thumb'));
+          goToSlide(idx);
+          setOverviewOpen(false);
+        });
+      });
+
+      overviewBtn.addEventListener('click', () => setOverviewOpen(true));
+      closeOverviewBtn.addEventListener('click', () => setOverviewOpen(false));
+
+      overviewOverlay.addEventListener('click', (event) => {
+        if (event.target === overviewOverlay) {
+          setOverviewOpen(false);
+        }
+      });
+
+      fullscreenBtn.addEventListener('click', toggleFullscreen);
+      document.addEventListener('fullscreenchange', syncFullscreenUI);
+      document.addEventListener('webkitfullscreenchange', syncFullscreenUI);
+
+      // ======================================================================
+      // NAVEGACIÓN POR TECLADO
+      // ======================================================================
+      document.addEventListener('keydown', (event) => {
+        const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea') return;
+
+        const isOverviewOpen = overviewOverlay.classList.contains('open');
+
+        if (event.key === 'Escape' && isOverviewOpen) {
+          event.preventDefault();
+          setOverviewOpen(false);
+          return;
+        }
+
+        // Si el modal de vista general está abierto, no cambiar diapositivas detrás
+        if (isOverviewOpen) return;
+
+        switch (event.key) {
+          case 'ArrowRight':
+            event.preventDefault();
+            goToSlide(currentIndex + 1);
+            break;
+          case ' ':
+            event.preventDefault();
+            goToSlide(currentIndex + 1);
+            break;
+          case 'ArrowLeft':
+            event.preventDefault();
+            goToSlide(currentIndex - 1);
+            break;
+          case 'Home':
+            event.preventDefault();
+            goToSlide(0);
+            break;
+          case 'End':
+            event.preventDefault();
+            goToSlide(totalSlides - 1);
+            break;
+          case 'f':
+          case 'F':
+            event.preventDefault();
+            toggleFullscreen();
+            break;
+          case '1':
+          case '2':
+          case '3':
+          case '4':
+            goToSlide(Number(event.key) - 1);
+            break;
+          default:
+            break;
+        }
+      });
+
+      // ======================================================================
+      // GESTOS TÁCTILES (SWIPE IZQUIERDA / DERECHA) PARA MÓVILES
+      // ======================================================================
+      slideDeck.addEventListener('touchstart', (event) => {
+        if (event.touches.length !== 1) return;
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
+        isSwiping = true;
+      }, { passive: true });
+
+      slideDeck.addEventListener('touchend', (event) => {
+        if (!isSwiping || !event.changedTouches.length) return;
+        isSwiping = false;
+
+        const deltaX = event.changedTouches[0].clientX - touchStartX;
+        const deltaY = event.changedTouches[0].clientY - touchStartY;
+
+        // Solo activar swipe si el desplazamiento horizontal es claro y domina sobre el vertical
+        if (Math.abs(deltaX) > 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+          if (deltaX < 0) {
+            goToSlide(currentIndex + 1);
+          } else {
+            goToSlide(currentIndex - 1);
+          }
+        }
+      }, { passive: true });
+
+      // ======================================================================
+      // INICIALIZACIÓN (SOPORTA ENLACE DIRECTO CON #lamina-X)
+      // ======================================================================
+      function initFromHash() {
+        const match = window.location.hash.match(/^#lamina-(\d+)$/);
+        if (match) {
+          const parsed = Number(match[1]) - 1;
+          if (parsed >= 0 && parsed < totalSlides && parsed !== 0) {
+            slides[0].classList.remove('active');
+            slides[parsed].classList.add('active');
+            currentIndex = parsed;
+          }
+        }
+        updateUI();
+      }
+
+      initFromHash();
+    })();
+  </script>
+</body>
+</html>
